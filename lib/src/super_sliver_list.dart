@@ -616,6 +616,7 @@ class _CancelToken with ChangeNotifier {
     if (!isCanceled) {
       isCanceled = true;
       notifyListeners();
+      dispose();
     }
   }
 }
