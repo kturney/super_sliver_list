@@ -71,6 +71,8 @@ class ListController extends ChangeNotifier {
   /// Returns `true` if the controller is attached to a [SuperSliverList].
   bool get isAttached => _delegate != null;
 
+  _CancelToken? _animationCanceler;
+
   /// Immediately positions the scroll view such that the item at [index] is
   /// revealed in the viewport.
   ///
@@ -90,6 +92,8 @@ class ListController extends ChangeNotifier {
     Rect? rect,
   }) {
     assert(_delegate != null, "ListController is not attached.");
+    _animationCanceler?.cancel();
+    _animationCanceler = null;
     final offset = getOffsetToReveal(index, alignment, rect: rect);
     if (offset.isFinite) {
       final minExtent = scrollController.position.minScrollExtent;
@@ -134,6 +138,9 @@ class ListController extends ChangeNotifier {
   }) async {
     assert(_delegate != null, "ListController is not attached.");
 
+    _animationCanceler?.cancel();
+    final canceler = _animationCanceler = _CancelToken();
+
     await Future.wait([
       for (final position in scrollController.positions)
         AnimateToItem(
@@ -144,6 +151,7 @@ class ListController extends ChangeNotifier {
           position: position,
           curve: curve,
           duration: duration,
+          canceler: canceler,
         ).animate(),
     ]);
   }
@@ -272,6 +280,8 @@ class ListController extends ChangeNotifier {
     if (_delegate == delegate) {
       _delegate?.removeListener(notifyListeners);
       _delegate = null;
+      _animationCanceler?.cancel();
+      _animationCanceler = null;
       onDetached?.call();
     }
   }
@@ -598,4 +608,16 @@ class _TimeSuperSliverListLayoutBudget extends SuperSliverListLayoutBudget {
 
 double _defaultEstimateExtent(int? index, double crossAxisExtent) {
   return 100.0;
+}
+
+class _CancelToken with ChangeNotifier {
+  bool isCanceled = false;
+
+  void cancel() {
+    if (!isCanceled) {
+      isCanceled = true;
+      notifyListeners();
+      dispose();
+    }
+  }
 }
